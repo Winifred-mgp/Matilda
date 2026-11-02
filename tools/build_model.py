@@ -11,6 +11,7 @@ import sys, json, os
 import numpy as np
 from scipy import ndimage
 import spec as S
+import finish_layers
 
 R = 10          # opening-snapping raster, mm / px
 RF = 20         # floor flood-fill raster, mm / px
@@ -121,7 +122,7 @@ def build(extracted_path, out_js, qa_dir=None):
         # --- walls
         for x0, z0, x1, z1 in walls:
             if x1 - x0 < 20 or z1 - z0 < 20: continue
-            model['boxes'].append(dict(l=lv, m='wall', c='wall', b=[x0, fl_y, z0, x1, top, z1]))
+            model['boxes'].append(dict(l=lv, m='post' if S.is_post(lv, [x0, z0, x1, z1]) else 'wall', c='wall', b=[x0, fl_y, z0, x1, top, z1]))
         # --- openings
         ops = []
         for o in S.OPENINGS[lv]:
@@ -208,9 +209,13 @@ def build(extracted_path, out_js, qa_dir=None):
     for f in S.FURNITURE:
         x0, z0, x1, z1 = S.pxr(f['img'], *f['p'])
         fy = S.LEVELS[f['l']]['floor']
-        model['boxes'].append(dict(l=f['l'], m='fur', c='solid' if f['solid'] else 'deco', col=f['col'], n=f['name'],
-                                   b=[x0, fy + f['y0'], z0, x1, fy + f['y1'], z1]))
+        d = dict(l=f['l'], m='fur', c='solid' if f['solid'] else 'deco', col=f['col'], n=f['name'],
+                 b=[x0, fy + f['y0'], z0, x1, fy + f['y1'], z1])
+        if f['name'] in S.KMAP:
+            d['k'] = S.KMAP[f['name']]
+        model['boxes'].append(d)
     add_stair(model)
+    finish_layers.apply(model, qa)
     # --- spawn: front door hall
     gx, gz = S.px('Gb', 835, 760)
     fx, fz = S.px('Ft', 800, 640)
@@ -238,7 +243,7 @@ def add_opening(model, lv, g, fl_y, top):
         d = dict(l=lv, m=m, c=c, b=bx)
         if col: d['col'] = col
         model['boxes'].append(d)
-    def thin(m, c, a, b, y0, y1, col=None, t=40):
+    def thin(m, c, a, b, y0, y1, col=None, t=40, k=None):
         if along_x:
             cz = (z0 + z1) // 2
             bx = [a, fl_y + y0, cz - t // 2, b, fl_y + y1, cz + t // 2]
@@ -247,6 +252,7 @@ def add_opening(model, lv, g, fl_y, top):
             bx = [cx - t // 2, fl_y + y0, a, cx + t // 2, fl_y + y1, b]
         d = dict(l=lv, m=m, c=c, b=bx)
         if col: d['col'] = col
+        if k: d['k'] = k
         model['boxes'].append(d)
     a0, a1 = (x0, x1) if along_x else (z0, z1)
     wtop = top - fl_y
@@ -275,8 +281,8 @@ def add_opening(model, lv, g, fl_y, top):
         box('wall', 'wall', a0, a1, head, wtop)
         # door frame (jambs + head)
         ft = 35
-        thin('frame', 'deco', a0, a0 + ft, 0, head, '#e9e6df', t=max(90, (z1 - z0) if along_x else (x1 - x0)))
-        thin('frame', 'deco', a1 - ft, a1, 0, head, '#e9e6df', t=max(90, (z1 - z0) if along_x else (x1 - x0)))
+        thin('frame', 'deco', a0, a0 + ft, 0, head, t=max(90, (z1 - z0) if along_x else (x1 - x0)), k='trim')
+        thin('frame', 'deco', a1 - ft, a1, 0, head, t=max(90, (z1 - z0) if along_x else (x1 - x0)), k='trim')
     elif k == 'slider':
         head = g['head'] or S.DOOR_HEAD
         box('wall', 'wall', a0, a1, head, wtop)
@@ -291,22 +297,20 @@ def add_opening(model, lv, g, fl_y, top):
             thin('frame', 'solid', a0, a0 + 45, 0, head); thin('frame', 'solid', mid - 45, mid, 0, head)
             thin('frame', 'solid', a0, mid, 0, 45); thin('frame', 'solid', a0, mid, head - 45, head)
         else:
-            thin('door', 'solid', a0, mid, 0, head - 30, '#ece9e3', t=45)
+            thin('door', 'solid', a0, mid, 0, head - 30, t=45, k=S.SLIDER_KEYS.get(g['name'], 'door_white'))
     elif k == 'garage':
         head = g['head'] or S.WIN_HEAD
         box('wall', 'wall', a0, a1, head, wtop)
-        thin('door', 'solid', a0, a1, 0, head, '#d8d9dc', t=60)
-        for i in range(1, 5):
-            thin('frame', 'deco', a0, a1, i * head // 5 - 8, i * head // 5 + 8, '#9a9da1', t=70)
+        thin('door', 'solid', a0, a1, 0, head, t=60, k='garage_door')
     elif k == 'entry':
         box('wall', 'wall', a0, a1, S.WIN_HEAD, wtop)
         door_w = 860
-        thin('frame', 'deco', a0, a0 + 45, 0, S.WIN_HEAD, '#3a2d25', t=120)
-        thin('frame', 'deco', a0 + door_w, a0 + door_w + 45, 0, S.WIN_HEAD, '#3a2d25', t=120)
-        thin('frame', 'deco', a0, a0 + door_w + 45, S.WIN_HEAD - 45, S.WIN_HEAD, '#3a2d25', t=120)
+        thin('frame', 'deco', a0, a0 + 45, 0, S.WIN_HEAD, t=120, k='door_monument')
+        thin('frame', 'deco', a0 + door_w, a0 + door_w + 45, 0, S.WIN_HEAD, t=120, k='door_monument')
+        thin('frame', 'deco', a0, a0 + door_w + 45, S.WIN_HEAD - 45, S.WIN_HEAD, t=120, k='door_monument')
         # sidelight
         cx = (x0 + x1) // 2; cz = (z0 + z1) // 2
-        gl = dict(l=lv, obscure=False, b=None)
+        gl = dict(l=lv, obscure=True, b=None)          # translucent sidelight (addenda: Hume translucent glazing)
         gl['b'] = [a0 + door_w + 45, fl_y, cz - 6, a1, fl_y + S.WIN_HEAD, cz + 6] if along_x else [cx - 6, fl_y, a0 + door_w + 45, cx + 6, fl_y + S.WIN_HEAD, a1]
         model['glass'].append(gl)
         model['boxes'].append(dict(l=lv, m='none', c='solid', invisible=True,

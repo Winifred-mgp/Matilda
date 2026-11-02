@@ -187,7 +187,7 @@ LABELS = [
 
 # ----------------------------------------------------------------------------- furniture & fixtures
 # (level, img, x0, y0, x1, y1, y0mm, y1mm, colour, solid, name)   px box on the crop
-W_ = '#f2f1ee'; TIM = '#b58a5b'; DK = '#34383d'; GR = '#8c9299'; FAB = '#7d8590'; BED = '#e7e3dc'
+W_ = '#f2f1ee'; TIM = '#8b6f55'; DK = '#34383d'; GR = '#8c9299'; FAB = '#7f8389'; BED = '#ece8e1'
 CAB = '#e3ded4'; BENCH = '#cfcac0'; PORC = '#fbfbfb'; CAR = '#aeb4bb'
 
 
@@ -322,3 +322,74 @@ STAIR = dict(
     void_B=(7099, 10089 + ZSHIFT, 10090, 11168 + ZSHIFT),
     guard_h=1050,
 )
+
+
+# =============================================================================================
+# FINISHES (from the selection addenda)
+# =============================================================================================
+# Door leaves, read from the swing arcs on the sketch. leaf = (hinge end along the gap, side the leaf swings to)
+#   hinge: 'min' | 'max' | 'both' (double doors);  side: +1 = toward +X / +Z, -1 = toward -X / -Z
+LEAVES = {
+    'Garage side door': ('min', +1), 'Garage internal door': ('max', -1), 'Powder room door': ('max', -1),
+    'Linen door': ('max', +1), 'Laundry doors': ('both', -1), 'Store door': ('min', -1),
+    'Bed 4 door': ('max', -1), 'Bed 3 door': ('max', +1), 'Bed 2 door': ('min', +1),
+    'Bath door': ('min', -1), 'WC door': ('max', +1), 'Walk-in linen door': ('max', +1),
+    'Master suite door': ('max', +1), 'Ensuite WC door': ('max', -1),
+}
+ENTRY_LEAF = ('min', -1)          # front door opens inward
+SLIDER_KEYS = {                   # sliding robe doors (vinyl) and cavity sliders
+    'Bed 4 robe doors': 'glacier', 'Bed 3 robe doors': 'glacier', 'Bed 2 robe doors': 'parchment',
+}
+EXT_DOORS = ('Garage side door',)  # painted Monument rather than Natural White
+
+# Material key for each furniture / fixture box (matches web/app.js MATS)
+KMAP = {
+    'Island base': 'cab_flo_dr', 'Island top': 'cala', 'Kitchen bench W': 'cab_flo', 'Bench top W': 'cala',
+    'Kitchen bench N': 'cab_flo', 'Bench top N': 'cala', 'Cooktop': 'cooktop', 'Sink': 'sink',
+    'Fridge': 'steel', 'Vanity': 'cab_flo_dr', 'Double vanity': 'cab_flo_dr', 'Laundry trough': 'steel',
+    'Linen shelves': 'melamine', 'WIR shelves W': 'melamine', 'WIR shelves E': 'melamine', 'WIR island': 'melamine',
+    'Robe unit': 'melamine', 'WIL shelves': 'melamine', 'Bath': 'porcelain', 'Toilet': 'porcelain', 'Cistern': 'porcelain',
+    'Washing machine': 'appliance', 'Dryer': 'appliance', 'Outdoor table top': 'stain_wood', 'Dining table top': 'oak_table',
+    'TV unit / fireplace': 'black_matt', 'Media unit': 'cab_flo_dr',
+}
+
+# Wet-room wall treatment. side = where the wall sits relative to the room: N, S, E, W
+#   tile: full-height wall tile; feature: (tile key, side); splash: list of (tile key, side, (a0,a1) px-range, y0, y1)
+WET = {
+    'Bath':            dict(tile='tile_omni', feature=('tile_belga', 'W'),
+                            splash=[('tile_fire', 'S', ('Ft', 452, 562), 870, 1470)]),
+    'Ensuite':         dict(tile='tile_omni', feature=('tile_omnistone', 'E')),
+    'Ensuite WC':      dict(tile='tile_omni'),
+    'Ensuite shower':  dict(tile='tile_omni', feature=('tile_omnistone', 'W')),
+    'Ensuite bath':    dict(tile='tile_omni', feature=('tile_omnistone', 'N')),
+    'Powder room':     dict(tile='tile_omni', feature=('tile_belga', 'E'),
+                            splash=[('tile_fire', 'E', ('Gb', 340, 455), 870, 1470)]),
+    'Laundry':         dict(splash=[('tile_fire', 'E', ('Gb', 530, 620), 1000, 1600)]),
+}
+# Kitchen splashback (Nostalgia 75x300): walls behind the benches in the open-plan room
+KITCHEN_SPLASH = [('W', ('Gt', 585, 1230)), ('N', ('Gt', 405, 685))]   # (side, px range along the wall)
+SPLASH_Y = (920, 1520)
+
+# Shower screens (thin lines on the plan, px) and shower rails / floor waste
+SCREENS = [
+    ('F', 'Fb', 972, 385, 972, 560), ('F', 'Ft', 435, 568, 435, 668),
+    ('G', 'Gb', 1215, 135, 1215, 235), ('G', 'Gb', 1215, 235, 1320, 235),
+]
+SHOWERS = [   # (level, img, rail px, waste px)
+    ('F', 'Fb', (856, 470), (910, 480)), ('F', 'Ft', (342, 640), (385, 620)), ('G', 'Gb', (1312, 190), (1270, 190)),
+]
+BASINS = [    # (level, img, basin centre px, tap px, matt white?) over the vanity tops
+    ('G', 'Gb', (1288, 398), (1313, 398)), ('F', 'Ft', (507, 860), (507, 880)),
+    ('F', 'Fb', (1203, 340), (1228, 340)), ('F', 'Fb', (1203, 462), (1228, 462)),
+]
+# Roof: hip over the first-floor mass, flat metal deck over the lower ground-floor parts
+ROOF = dict(pitch_deg=22.5, overhang=600, deck=3000)
+
+
+def is_post(lv, w):
+    """Outdoor-living posts: small square wall rectangles inside the outdoor-living area (stained timber, not brick)."""
+    if lv != 'G':
+        return False
+    cx0, cz0, cx1, cz1 = pxr('Gt', 305, -190, 655, 572)
+    mx, mz = (w[0] + w[2]) / 2, (w[1] + w[3]) / 2
+    return (w[2] - w[0]) <= 700 and (w[3] - w[1]) <= 700 and cx0 - 500 <= mx <= cx1 + 500 and cz0 - 500 <= mz <= cz1 + 120
