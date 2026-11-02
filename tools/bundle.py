@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Inline web/ (three.js + model + app) into one self-contained HTML file.
 
-  python3 tools/bundle.py [out.html]      (default: dist/airlie30-3d.html)
+  python3 tools/bundle.py [out.html]              (default: dist/airlie30-3d.html)
+  python3 tools/bundle.py --fragment out.html     (no <html>/<head>/<body>, for hosts that add their own page shell)
 """
 import os, re, sys
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 web = os.path.join(root, 'web')
-out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(root, 'dist', 'airlie30-3d.html')
+args = [a for a in sys.argv[1:] if a != '--fragment']
+fragment = '--fragment' in sys.argv
+out = args[0] if args else os.path.join(root, 'dist', 'airlie30-3d.html')
 html = open(os.path.join(web, 'index.html'), encoding='utf-8').read()
 
 def inline(m):
@@ -15,6 +18,10 @@ def inline(m):
     return '<script>/* %s */\n%s\n</script>' % (src, code)
 
 html = re.sub(r'<script src="([^"]+)"></script>', inline, html)
+if fragment:
+    for pat in (r'<!doctype html>\s*', r'<html[^>]*>\s*', r'</html>', r'<head>\s*', r'</head>\s*', r'<meta charset[^>]*>\s*',
+                r'<meta name="viewport"[^>]*>\s*', r'<body[^>]*>\s*', r'</body>\s*'):
+        html = re.sub(pat, '', html, flags=re.I)
 os.makedirs(os.path.dirname(out), exist_ok=True)
 open(out, 'w', encoding='utf-8').write(html)
 print(out, os.path.getsize(out) // 1024, 'KB')
