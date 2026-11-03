@@ -187,7 +187,7 @@ LABELS = [
 
 # ----------------------------------------------------------------------------- furniture & fixtures
 # (level, img, x0, y0, x1, y1, y0mm, y1mm, colour, solid, name)   px box on the crop
-W_ = '#f2f1ee'; TIM = '#8b6f55'; DK = '#34383d'; GR = '#8c9299'; FAB = '#7f8389'; BED = '#ece8e1'
+W_ = '#f2f1ee'; TIM = '#8b6f55'; DK = '#34383d'; GR = '#8c9299'; FAB = '#8a8378'; BED = '#ece8e1'
 CAB = '#e3ded4'; BENCH = '#cfcac0'; PORC = '#fbfbfb'; CAR = '#aeb4bb'
 
 

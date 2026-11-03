@@ -23,6 +23,21 @@ geometry in the plan PDF, so wall positions and room sizes follow the drawing (f
 floors (Walk) or show/hide floors (Dollhouse). “Jump to room…” teleports to any room, and you can click
 the mini‑map to move. Dollhouse has a **cut‑away walls** option so you can look straight into the rooms.
 
+## Photoreal rendering
+
+The walkthrough renders with a physically based pipeline (`web/render.js`):
+
+* a physical sky and sun, with the sun slider sweeping all the way around the house, from low rear light through the street-side midday to the other side;
+* image-based lighting from that sky, indoor / outdoor exposure adaptation like a camera, and soft room fill lights that follow you;
+* a shadow-mapped sun (4096 px) so sunlight only enters through the windows, with the roof, walls and slab casting real shadows;
+* screen-space ambient occlusion, a touch of bloom, ACES filmic tone mapping with sRGB output and FXAA;
+* PBR materials: roughness / metalness, clearcoat on polished stone and porcelain, bump relief on grout, brick joints and carpet pile, reflective glass;
+* rounded soft furniture, dressed beds and rugs, a textured lawn, driveway and path.
+
+Use the **Quality** menu: *Photoreal* (default on desktop), *Balanced* (shadows only, default on phones) or *Fast*. If the frame rate drops, the page
+steps down by itself. `?q=photo|balanced|fast` and `?t=0..100` (sun) set them from the address bar. Ambient occlusion is switched off in the
+cut-away dollhouse view, where the clipped walls would confuse it.
+
 ## Finishes (from the interior design addenda)
 
 The model carries the selections from the job's interior design addenda: 34 products across roof, brick, render,
@@ -74,4 +89,4 @@ python3 tools/bundle.py                                     # -> dist/airlie30-3
 crops of the sketch; `tools/overlay.py` regenerates those crops with the extracted walls drawn on top.
 The plan and addenda PDFs are not part of this repository (they carry the client's details).
 
-Three.js r128 (MIT) is vendored in `web/vendor/`.
+Three.js r128 and its example post-processing passes (MIT) are vendored in `web/vendor/`.
