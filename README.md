@@ -85,7 +85,7 @@ the choice is an assumption. Garage, porch and outdoor-living floors are not spe
 pip install pdfplumber pillow numpy scipy
 python3 -I tools/finishes.py      addenda.pdf web/finishes.js  # swatches + catalogue from the selection addenda
 python3 -I tools/extract_plan.py  sketch.pdf work          # walls + labels from the PDF -> work/extracted.json
-python3 -I tools/build_model.py   work/extracted.json web/model.js work/qa   # openings, floors, stair, furniture (+ QA pictures)
+(cd tools && python3 build_model.py ../work/extracted.json ../web/model.js ../work/qa)   # openings, floors, stair, furniture, doors (+ QA pictures)
 python3 tools/bundle.py                                     # -> dist/airlie30-3d.html
 ```
 
@@ -94,3 +94,15 @@ crops of the sketch; `tools/overlay.py` regenerates those crops with the extract
 The plan and addenda PDFs are not part of this repository (they carry the client's details).
 
 Three.js r128 and its example post-processing passes (MIT) are vendored in `web/vendor/`.
+
+## Testing
+
+Headless checks live in `tools/qa/` and drive the page through the `window.__tour` hooks. They need `npm i playwright` (and its
+Chromium); software rendering is slow, so allow a few minutes for the photoreal screenshots.
+
+```bash
+node tools/qa/reach.js      # flood-fill reachability with all doors closed, then all open; prints rooms that cannot be reached
+node tools/qa/interact.js   # closed doors block, E / click / Open all work, closing refuses while the leaf would sweep the player
+mkdir -p shots && node tools/qa/shots.js photo 1000 600 hall '[{"name":"hall","js":"__tour.teleport(6468,17729,\"G\",0,-0.02)","wait":14000}]'
+mkdir -p shots && node tools/qa/doorshot.js balanced 900 520 doors '[{"door":"Bed 3 door","dist":0.9,"open":true}]'
+```
