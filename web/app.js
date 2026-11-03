@@ -586,6 +586,7 @@
   function syncUI() {
     document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === state.mode));
     $('tCeil').checked = state.ceil; $('tLabels').checked = state.labels; $('tFur').checked = state.fur; $('tCut').checked = state.cut; $('tRoof').checked = state.roof;
+    if (FX) { $('qual').value = FX.state.quality; $('tod').value = Math.round(FX.state.tod * 100); }
     $('cutWrap').style.display = state.mode === 'orbit' ? '' : 'none';
     $('bothBtn').style.display = state.mode === 'orbit' ? '' : 'none';
     $('help').dataset.mode = state.mode;
