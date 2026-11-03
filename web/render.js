@@ -69,7 +69,7 @@
       u.sunPosition.value.copy(dir);
       const k = Math.min(1, Math.max(0, (el - 11) / 36));                        // low sun = warm and weaker
       sun.color.setRGB(1, 0.72 + 0.25 * k, 0.5 + 0.42 * k);
-      sun.intensity = 0.9 + 1.5 * Math.sin(e);
+      sun.intensity = 0.8 + 1.25 * Math.sin(e);
       if (envRT) envRT.dispose();
       envRT = pmrem.fromScene(envScene);
       scene.environment = envRT.texture; scene.background = envRT.texture;
@@ -160,7 +160,7 @@
     /** eye adaptation: brighter exposure and weaker sky light when you are indoors */
     function adapt(inside, dt) {
       const k = Math.min(1, dt * 2.2);
-      S.exposure += ((0.36 + 0.58 * inside) - S.exposure) * k;
+      S.exposure += ((0.36 + 0.46 * inside) - S.exposure) * k;
       const env = 1.0 - 0.8 * inside;
       if (Math.abs(env - S.env) > 0.01) {
         S.env = env;

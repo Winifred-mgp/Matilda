@@ -148,15 +148,23 @@
         swatchInto(g, key, x, y, ww, hh, r, { alpha: 0.9, min: 0.35 });
       }
     }
+    function tileBump(g, w, h, cols, rows, gap, off) {
+      const tw = w / cols, th = h / rows;
+      g.fillStyle = '#1c1c1c'; g.fillRect(0, 0, w, h);
+      for (let j = 0; j < rows; j++) for (let i = -1; i <= cols; i++) {
+        const x = i * tw + (off && j % 2 ? tw / 2 : 0);
+        g.fillStyle = '#cfcfcf'; g.fillRect(x + gap / 2, j * th + gap / 2, tw - gap, th - gap);
+      }
+    }
     // Omniform Grey Matt 450 x 450 (floor and wall)
-    tex('omniform', 512, 512, 0.9, 0.9, (g, w, h) => tileGrid(g, w, h, 2, 2, 'omniform', '#C4C4C3', GROUT, 31, 2));
-    M.tile_omni = lam(T.omniform, { roughness: 0.68, bumpMap: T.omniform, bumpScale: 0.6 });
+    tex('omniform', 512, 512, 0.9, 0.9, (g, w, h) => tileGrid(g, w, h, 2, 2, 'omniform', '#C4C4C3', GROUT, 31, 2), { bump: (g, w, h) => tileBump(g, w, h, 2, 2, 2) });
+    M.tile_omni = lam(T.omniform, { roughness: 0.68, bumpMap: hmap('omniform'), bumpScale: 1.0 });
     M.skirt_tile = col('#C4C4C3', { roughness: 0.7 });
     // Belga Charcoal textured 300 x 600 (laid vertically) and Omni Stone Charcoal Silk 300 x 600
-    tex('belga', 512, 512, 0.6, 0.6, (g, w, h) => tileGrid(g, w, h, 2, 1, 'belga', '#4B4642', '#6E6C69', 41, 2));
-    M.tile_belga = lam(T.belga, { roughness: 0.62, bumpMap: T.belga, bumpScale: 0.7 });
-    tex('omnistone', 512, 512, 0.6, 0.6, (g, w, h) => tileGrid(g, w, h, 2, 1, 'omnistone', '#5E5F5A', '#6E6C69', 51, 2));
-    M.tile_omnistone = lam(T.omnistone, { roughness: 0.45, bumpMap: T.omnistone, bumpScale: 0.5 });
+    tex('belga', 512, 512, 0.6, 0.6, (g, w, h) => tileGrid(g, w, h, 2, 1, 'belga', '#4B4642', '#6E6C69', 41, 2), { bump: (g, w, h) => tileBump(g, w, h, 2, 1, 2) });
+    M.tile_belga = lam(T.belga, { roughness: 0.62, bumpMap: hmap('belga'), bumpScale: 1.0 });
+    tex('omnistone', 512, 512, 0.6, 0.6, (g, w, h) => tileGrid(g, w, h, 2, 1, 'omnistone', '#5E5F5A', '#6E6C69', 51, 2), { bump: (g, w, h) => tileBump(g, w, h, 2, 1, 2) });
+    M.tile_omnistone = lam(T.omnistone, { roughness: 0.45, bumpMap: hmap('omnistone'), bumpScale: 1.0 });
     // Nostalgia White Satin 75 x 300, brick bond horizontal, Misty Grey grout
     tex('nostalgia', 512, 256, 0.6, 0.3, (g, w, h) => {
       const r = rng(61), rows = 4, th = h / rows, tw = w / 2;
@@ -167,7 +175,7 @@
         g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x + 1, j * th + 1, tw - 2, 2);
       }
     });
-    M.tile_nostalgia = lam(T.nostalgia, { roughness: 0.32, bumpMap: T.nostalgia, bumpScale: 0.8 });
+    M.tile_nostalgia = lam(T.nostalgia, { roughness: 0.32 });
     // Fire Fingers White Gloss 293 x 296 mosaic sheet (vertical stack)
     tex('fire', 256, 256, 0.293, 0.296, (g, w, h) => {
       if (ok('fire')) g.drawImage(imgs.fire, 0, 0, w, h);
@@ -176,7 +184,7 @@
         for (let i = 0; i < 12; i++) { g.fillStyle = '#F4F4F2'; g.fillRect(i * w / 12 + 2, 2, w / 12 - 4, h - 4); }
       }
     });
-    M.tile_fire = phy({ map: T.fire, roughness: 0.14, clearcoat: 0.7, clearcoatRoughness: 0.1, bumpMap: T.fire, bumpScale: 0.6 });
+    M.tile_fire = phy({ map: T.fire, roughness: 0.14, clearcoat: 0.7, clearcoatRoughness: 0.1 });
 
     // wool rug (living room, bedrooms)
     tex('rug', 256, 256, 1, 1, (g, w, h) => {

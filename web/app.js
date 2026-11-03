@@ -39,12 +39,12 @@
     return t;
   })();
   const MAT = {
-    glass: new THREE.MeshPhysicalMaterial({ color: C('#d8e7ee'), transparent: true, opacity: 0.2, roughness: 0.03, metalness: 0, reflectivity: 0.9, envMapIntensity: 3.2, depthWrite: false, side: THREE.DoubleSide }),
+    glass: new THREE.MeshPhysicalMaterial({ color: C('#d8e7ee'), transparent: true, opacity: 0.2, roughness: 0.03, metalness: 0, reflectivity: 0.9, envMapIntensity: 2.0, depthWrite: false, side: THREE.DoubleSide }),
     obscure: new THREE.MeshStandardMaterial({ color: C('#dfe6e8'), transparent: true, opacity: 0.88, roughness: 0.55, depthWrite: false, side: THREE.DoubleSide }),
     grass: new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1, metalness: 0, bumpMap: grassTex, bumpScale: 2 }),
     glassHi: null,
   };
-  MAT.glass.userData.env0 = 3.2; MAT.obscure.userData.env0 = 1;
+  MAT.glass.userData.env0 = 2.0; MAT.obscure.userData.env0 = 1;
   const colMats = {};
   const colMat = (hex) => colMats[hex] || (colMats[hex] = new THREE.MeshStandardMaterial({ color: C(hex), roughness: 0.82, metalness: 0 }));
   const FLOOR_KEY = { timber: 'oak', carpet: 'carpet', tile: 'tile_omni', concrete: 'concrete' };
