@@ -286,18 +286,7 @@ def add_opening(model, lv, g, fl_y, top):
     elif k == 'slider':
         head = g['head'] or S.DOOR_HEAD
         box('wall', 'wall', a0, a1, head, wtop)
-        # half-open sliding panels
-        glassy = g['name'].lower().find('stacker') >= 0
-        mid = a0 + int((a1 - a0) * (0.45 if glassy else 0.35))
-        if glassy:
-            gl = dict(l=lv, obscure=False, b=None)
-            cx = (x0 + x1) // 2; cz = (z0 + z1) // 2
-            gl['b'] = [a0, fl_y, cz - 6, mid, fl_y + head, cz + 6] if along_x else [cx - 6, fl_y, a0, cx + 6, fl_y + head, mid]
-            model['glass'].append(gl)
-            thin('frame', 'solid', a0, a0 + 45, 0, head); thin('frame', 'solid', mid - 45, mid, 0, head)
-            thin('frame', 'solid', a0, mid, 0, 45); thin('frame', 'solid', a0, mid, head - 45, head)
-        else:
-            thin('door', 'solid', a0, mid, 0, head - 30, t=45, k=S.SLIDER_KEYS.get(g['name'], 'door_white'))
+        # the sliding panels themselves are door records (finish_layers._doors), drawn closed by the viewer
     elif k == 'garage':
         head = g['head'] or S.WIN_HEAD
         box('wall', 'wall', a0, a1, head, wtop)

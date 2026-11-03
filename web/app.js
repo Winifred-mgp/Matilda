@@ -55,7 +55,7 @@
   const parts = {};   // parts[level] = {walls, fur, glass, floors, ceil, labels, panels}
   for (const l of ['G', 'F']) {
     parts[l] = {};
-    for (const k of ['walls', 'fur', 'glass', 'floors', 'ceil', 'labels', 'panels']) { parts[l][k] = new THREE.Group(); G[l].add(parts[l][k]); }
+    for (const k of ['walls', 'fur', 'glass', 'floors', 'ceil', 'labels', 'panels', 'doors']) { parts[l][k] = new THREE.Group(); G[l].add(parts[l][k]); }
     scene.add(G[l]);
   }
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), MAT.grass);
@@ -161,6 +161,142 @@
   }
   for (const g of M.glass) addBox(g.b, g.obscure ? MAT.obscure : MAT.glass, parts[g.l].glass, false);
   for (const l of ['G', 'F']) parts[l].glass.traverse((o) => { if (o.isMesh) { o.layers.set(1); o.castShadow = false; o.receiveShadow = false; } });
+
+  // ------------------------------------------------------------------ doors: built closed; E / click / tap opens them
+  // Every door record from the model (hinged, double, sliding robe / cavity, glass stacker) becomes a small rig:
+  // a root group at floor level, animated parts, a collision slab that is live only while the door is shut,
+  // and an invisible pick proxy.  State e runs 0 (closed) .. 1 (open).
+  const DOORS = [];
+  const DOOR_SPEED = 2.4;                       // full swing in about 0.4 s
+  const doorEase = (t) => t * t * (3 - 2 * t);
+  (function buildDoors() {
+    const TAU = Math.PI * 2, T = 40;            // hinged leaf thickness (mm)
+    const norm = (a) => ((a + Math.PI) % TAU + TAU) % TAU - Math.PI;
+    const ang = (vx, vz) => Math.atan2(-vz, vx);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const pickMat = new THREE.MeshBasicMaterial({ visible: false });
+    function box(parent, x0, y0, z0, x1, y1, z1, mat, shade) {      // local mm, corners in any order
+      const m = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x1 - x0) * S, Math.abs(y1 - y0) * S, Math.abs(z1 - z0) * S), mat);
+      m.position.set((x0 + x1) / 2 * S, (y0 + y1) / 2 * S, (z0 + z1) / 2 * S);
+      m.castShadow = m.receiveShadow = shade !== false;
+      parent.add(m); return m;
+    }
+    function pane(parent, x0, y0, x1, y1, mat) {                     // glazing, kept out of the shadow and AO passes
+      const m = box(parent, x0, y0, -6, x1, y1, 6, mat, false); m.layers.set(1); return m;
+    }
+    /** a matt-black lever handle on both faces of a leaf, at local x = xs */
+    function lever(parent, xs, y) {
+      for (const f of [-1, 1]) {
+        const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.008, 18), MATS.black_matt);
+        rose.rotation.x = Math.PI / 2; rose.position.set(xs * S, y * S, f * (T / 2 + 4) * S); parent.add(rose);
+        box(parent, xs - 6, y - 6, f * T / 2, xs + 6, y + 6, f * (T / 2 + 40), MATS.black_matt);
+        box(parent, xs - 112, y - 9, f * (T / 2 + 34), xs + 14, y + 9, f * (T / 2 + 48), MATS.black_matt);
+      }
+    }
+    const worldXZ = (d, a, perp) => (d.ax === 'x' ? [a, perp] : [perp, a]);
+
+    for (const d of M.doors || []) {
+      const D = { d, e: 0, goal: 0, parts: [], coll: [], solidAt: 1, root: new THREE.Group(), name: d.n, level: d.l };
+      D.root.position.y = d.fl * S;
+      parts[d.l].doors.add(D.root);
+      const y1 = d.y1, y0 = d.y0, H = y1 - y0;
+
+      if (d.t === 'hinge' || d.t === 'double') {
+        const leaves = d.t === 'double' ? [['min', d.lo, (d.lo + d.hi) / 2 - 1.5], ['max', (d.lo + d.hi) / 2 + 1.5, d.hi]] : [[d.hg, d.lo, d.hi]];
+        for (const [hg, lo, hi] of leaves) {
+          const w = hi - lo, a = hg === 'min' ? lo : hi, dir = hg === 'min' ? 1 : -1;
+          const piv = new THREE.Group(), [px, pz] = worldXZ(d, a, d.c);
+          piv.position.set(px * S, 0, pz * S);
+          const closed = d.ax === 'x' ? [dir, 0] : [0, dir], open = d.ax === 'x' ? [0, d.sw] : [d.sw, 0];
+          const a0 = ang(closed[0], closed[1]), delta = norm(ang(open[0], open[1]) - a0);
+          piv.rotation.y = a0;
+          const mat = MATS[d.k];
+          if (d.entry) {
+            // Hume Newington XN1: a single tall translucent glazing slot toward the latch side
+            const sx = w * 0.7, sw = 90, g0 = 450, g1 = 1950;
+            box(piv, 0, y0, -T / 2, sx - sw / 2, y1, T / 2, mat);
+            box(piv, sx + sw / 2, y0, -T / 2, w, y1, T / 2, mat);
+            box(piv, sx - sw / 2, y0, -T / 2, sx + sw / 2, g0, T / 2, mat);
+            box(piv, sx - sw / 2, g1, -T / 2, sx + sw / 2, y1, T / 2, mat);
+            pane(piv, sx - sw / 2, g0, sx + sw / 2, g1, MAT.obscure);
+          } else box(piv, 0, y0, -T / 2, w, y1, T / 2, mat);
+          lever(piv, w - 58, 1000);
+          D.root.add(piv);
+          D.parts.push((e) => { piv.rotation.y = a0 + delta * e; });
+        }
+        // collision: the whole shut door, live until it has swung most of the way open
+        const sl = { x0: 0, x1: 0, z0: 0, z1: 0, y0: (d.fl + y0) * S, y1: (d.fl + y1) * S, tread: false, on: true };
+        const [ax0, az0] = worldXZ(d, d.lo - 20, d.c - 35), [ax1, az1] = worldXZ(d, d.hi + 20, d.c + 35);
+        sl.x0 = Math.min(ax0, ax1) * S; sl.x1 = Math.max(ax0, ax1) * S; sl.z0 = Math.min(az0, az1) * S; sl.z1 = Math.max(az0, az1) * S;
+        COLL.push(sl); D.coll.push(sl);
+        D.solidAt = 0.55;
+        // the area the leaf sweeps (to avoid closing a door on the player)
+        const sweep = Math.max(...leaves.map(([, lo, hi]) => hi - lo));
+        const [sx0, sz0] = worldXZ(d, d.lo, d.c), [sx1, sz1] = worldXZ(d, d.hi, d.c + d.sw * sweep);
+        D.sweep = { x0: Math.min(sx0, sx1) * S, x1: Math.max(sx0, sx1) * S, z0: Math.min(sz0, sz1) * S, z1: Math.max(sz0, sz1) * S };
+      } else {
+        // sliding panels: stacker (glass in black frames), two overlapping robe panels, or a single cavity slider
+        const gap = d.hi - d.lo, n = d.np;
+        let pw, closed = [], open = [], off = [];
+        if (d.t === 'stack') {
+          pw = gap / n + 30;
+          for (let i = 0; i < n; i++) { closed.push(d.lo + i * (gap - pw) / (n - 1)); open.push(d.lo + i * 70); off.push((i - (n - 1) / 2) * 62); }
+        } else if (n === 2) {
+          pw = gap / 2 + 25;
+          closed = [d.lo, d.hi - pw]; open = [d.lo, d.lo + 40]; off = [-14, 14];
+        } else {
+          pw = gap; closed = [d.lo]; open = [d.lo - gap * 0.93]; off = [0];       // slides into the wall pocket
+        }
+        D.slide = [];
+        for (let i = 0; i < n; i++) {
+          const g = new THREE.Group();
+          if (d.ax === 'z') g.rotation.y = -Math.PI / 2;
+          const perp = d.c + off[i];
+          const at = (start) => { const [wx, wz] = worldXZ(d, start, perp); g.position.set(wx * S, 0, wz * S); };
+          at(closed[i]);
+          if (d.t === 'stack') {
+            const ft = 50, fr = 60, dd = 55;
+            box(g, 0, y0, -dd / 2, 45, y1, dd / 2, MATS.frame); box(g, pw - 45, y0, -dd / 2, pw, y1, dd / 2, MATS.frame);
+            box(g, 45, y0, -dd / 2, pw - 45, y0 + fr, dd / 2, MATS.frame); box(g, 45, y1 - ft, -dd / 2, pw - 45, y1, dd / 2, MATS.frame);
+            pane(g, 45, y0 + fr, pw - 45, y1 - ft, MAT.glass);
+            // a vertical pull on the meeting stile
+            const xs = i === 0 ? pw - 22 : 22;
+            box(g, xs - 7, 900, dd / 2, xs + 7, 1250, dd / 2 + 14, MATS.black_matt); box(g, xs - 7, 900, -dd / 2 - 14, xs + 7, 1250, -dd / 2, MATS.black_matt);
+          } else {
+            const th = n === 2 ? 22 : 40, mat = MATS[d.k];
+            box(g, 0, y0, -th / 2, pw, y1, th / 2, mat);
+            const xs = n === 2 ? (i === 0 ? pw - 40 : 40) : pw - 45;
+            box(g, xs - 8, 900, th / 2, xs + 8, 1100, th / 2 + 12, MATS.black_matt); box(g, xs - 8, 900, -th / 2 - 12, xs + 8, 1100, -th / 2, MATS.black_matt);
+          }
+          D.root.add(g);
+          const sl = { x0: 0, x1: 0, z0: 0, z1: 0, y0: (d.fl + y0) * S, y1: (d.fl + y1) * S, tread: false, on: true };
+          COLL.push(sl); D.coll.push(sl);
+          const place = (e) => {
+            const st = lerp(closed[i], open[i], e);
+            at(st);
+            const [ax0, az0] = worldXZ(d, st, perp - 30), [ax1, az1] = worldXZ(d, st + pw, perp + 30);
+            sl.x0 = Math.min(ax0, ax1) * S; sl.x1 = Math.max(ax0, ax1) * S; sl.z0 = Math.min(az0, az1) * S; sl.z1 = Math.max(az0, az1) * S;
+          };
+          D.parts.push(place); place(0);
+        }
+        D.solidAt = 2;                          // sliding panels always collide, wherever they have got to
+        const [sx0, sz0] = worldXZ(d, d.lo, d.c - 50 - 120), [sx1, sz1] = worldXZ(d, d.hi, d.c + 50 + 120);
+        D.sweep = { x0: Math.min(sx0, sx1) * S, x1: Math.max(sx0, sx1) * S, z0: Math.min(sz0, sz1) * S, z1: Math.max(sz0, sz1) * S };
+      }
+
+      // pick proxy: the whole gap, so an open door can be clicked to close it
+      const [qx0, qz0] = worldXZ(d, d.lo, d.c - d.thk / 2), [qx1, qz1] = worldXZ(d, d.hi, d.c + d.thk / 2);
+      const proxy = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(qx1 - qx0) * S, (y1 - y0) * S, Math.abs(qz1 - qz0) * S), pickMat);
+      proxy.position.set((qx0 + qx1) / 2 * S, (y0 + y1) / 2 * S, (qz0 + qz1) / 2 * S);
+      proxy.userData.door = D; proxy.visible = false;
+      D.root.add(proxy); D.proxy = proxy;
+      const [mx, mz] = worldXZ(d, (d.lo + d.hi) / 2, d.c);
+      D.mid = { x: mx * S, z: mz * S };
+      D.apply = (e) => { for (const f of D.parts) f(e); for (const c of D.coll) c.on = D.solidAt > 1 ? true : e < D.solidAt; };
+      D.apply(0);
+      DOORS.push(D);
+    }
+  })();
 
   // ------------------------------------------------------------------ wall-face panels: skirting, tiling, splashbacks, brick / render / cladding
   const panelMats = [];
@@ -301,7 +437,7 @@
   function blocked(x, z, feet) {
     for (let i = 0; i < COLL.length; i++) {
       const c = COLL[i];
-      if (!vOverlap(c, feet)) continue;
+      if (c.on === false || !vOverlap(c, feet)) continue;
       const cx = x < c.x0 ? c.x0 : x > c.x1 ? c.x1 : x, cz = z < c.z0 ? c.z0 : z > c.z1 ? c.z1 : z;
       const dx = x - cx, dz = z - cz;
       if (dx * dx + dz * dz < RADIUS * RADIUS) return true;
@@ -337,6 +473,68 @@
   }
   function levelOf(feet) { return feet > 1.6 ? 'F' : 'G'; }
 
+  // ------------------------------------------------------------------ door interaction
+  const raycaster = new THREE.Raycaster(); raycaster.far = 2.2;
+  const pickLists = {};
+  const pickList = (l) => pickLists[l] || (pickLists[l] = DOORS.filter((D) => D.level === l).map((D) => D.proxy).concat(parts[l].walls.children));
+  /** the door under a point on screen (normalised -1..1), if nothing solid is in front of it and it is within reach */
+  function doorAt(nx, ny) {
+    raycaster.setFromCamera({ x: nx, y: ny }, camera);
+    const hit = raycaster.intersectObjects(pickList(levelOf(P.feet)), false)[0];
+    return hit && hit.object.userData.door ? hit.object.userData.door : null;
+  }
+  const FAN = [[0, 0], [-0.1, 0], [0.1, 0], [0, -0.14], [-0.22, 0], [0.22, 0], [0, 0.14]];
+  function aimedDoor() {
+    if (state.mode !== 'walk') return null;
+    for (const [x, y] of FAN) { const D = doorAt(x, y); if (D) return D; }
+    return null;
+  }
+  /** open or close one door; closing refuses while the leaf's swing area has the player in it (force skips that and snaps) */
+  function setDoor(D, open, force, quiet) {
+    if (!open && !force && D.sweep && Math.abs(P.feet - D.d.fl * S) < 0.8 &&
+        P.x > D.sweep.x0 - RADIUS && P.x < D.sweep.x1 + RADIUS && P.z > D.sweep.z0 - RADIUS && P.z < D.sweep.z1 + RADIUS) {
+      if (!quiet) toast('Step clear of the door to close it');
+      return false;
+    }
+    D.goal = open ? 1 : 0;
+    if (force) { D.e = D.goal; D.apply(doorEase(D.e)); if (FX) FX.invalidateShadows(); }
+    return true;
+  }
+  function setAllDoors(open, force) {
+    let refused = 0;
+    for (const D of DOORS) if (!setDoor(D, open, force, true)) refused++;
+    if (refused) toast('Step clear of the swinging door' + (refused > 1 ? 's' : '') + ' to close ' + (refused > 1 ? 'them' : 'it'));
+    syncUI();
+  }
+  function interact() {
+    const D = aimedDoor();
+    if (D) { setDoor(D, !D.goal); syncUI(); }
+    return D;
+  }
+  function updateDoors(dt) {
+    let moved = false;
+    for (const D of DOORS) {
+      if (D.e === D.goal) continue;
+      const step = DOOR_SPEED * dt;
+      D.e = D.goal > D.e ? Math.min(D.goal, D.e + step) : Math.max(D.goal, D.e - step);
+      D.apply(doorEase(D.e)); moved = true;
+    }
+    if (moved && FX) FX.invalidateShadows();
+  }
+  const tip = $('doorTip'); let tipKey = '', tipT = 0, tipDoor = null;
+  function updateTip(dt) {
+    tipT += dt; if (tipT < 0.07) return; tipT = 0;
+    const D = aimedDoor(), key = D ? D.name + (D.goal ? '1' : '0') : '';
+    if (key === tipKey) return;
+    tipKey = key; tipDoor = D;
+    if (!D) { tip.classList.remove('on'); return; }
+    const coarse = matchMedia('(pointer:coarse)').matches;
+    tip.innerHTML = '<kbd>' + (coarse ? 'Tap' : 'E') + '</kbd> ' + (D.goal ? 'Close' : 'Open') + ' ' + D.name.replace(' + sidelight', '').replace(/^Front door$/, 'front door');
+    tip.classList.add('on');
+  }
+  tip.addEventListener('click', () => { if (tipDoor) { setDoor(tipDoor, !tipDoor.goal); tipKey = ''; syncUI(); } });
+  tip.addEventListener('pointerdown', (e) => e.stopPropagation());
+
   // ------------------------------------------------------------------ view modes
   const state = { mode: 'walk', level: 'G', ceil: true, labels: false, fur: true, cut: true, view: 'B', roof: true };
   const orbit = { a: 0.0, phi: 0.95, r: 38, t: new THREE.Vector3(5.6, 1.2, 12.2) };
@@ -363,6 +561,7 @@
       m.scale.y = Math.max(0.001, (Math.min(u.y1, cutY) - u.y0) / (u.y1 - u.y0));
     }
     for (const pm of panelMats) { pm.mat.clippingPlanes = cut ? [cutPlanes[pm.l]] : []; pm.mat.needsUpdate = true; }
+    for (const D of DOORS) D.root.scale.y = cut ? Math.max(0.001, Math.min(1, CUT / (D.d.y1 * S))) : 1;      // doors are cut down with the walls
     roofGroup.visible = state.roof;
     if (FX) { FX.invalidateShadows(); FX.setAO(!(state.mode === 'orbit' && state.cut)); }
     // ceilings only make sense when walking; in dollhouse view the user may still opt in
@@ -402,6 +601,7 @@
     if (e.code === 'Tab') { e.preventDefault(); setMode(state.mode === 'walk' ? 'orbit' : 'walk'); }
     if (e.code === 'KeyC') { $('tCeil').click(); }
     if (e.code === 'KeyM') { $('mini').classList.toggle('hide'); }
+    if (e.code === 'KeyE' && !e.repeat && state.mode === 'walk') interact();
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -456,8 +656,14 @@
     pointers.delete(e.pointerId); pinch = 0;
     if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; $('stick').style.display = 'none'; }
     if (e.pointerId === look.id) {
-      if (state.mode === 'walk' && look.moved < 5 && e.pointerType === 'mouse' && lockSupported() && document.pointerLockElement !== canvas) {
-        try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {}
+      if (state.mode === 'walk' && look.moved < 5) {
+        // a tap or click on a door works it; with the mouse captured the crosshair is the target
+        const locked = document.pointerLockElement === canvas;
+        const D = doorAt(locked ? 0 : (e.clientX / innerWidth) * 2 - 1, locked ? 0 : -(e.clientY / innerHeight) * 2 + 1);
+        if (D) { setDoor(D, !D.goal); tipKey = ''; syncUI(); }
+        else if (e.pointerType === 'mouse' && lockSupported() && !locked) {
+          try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {}
+        }
       }
       look.id = null;
     }
@@ -485,7 +691,7 @@
       let f = 0, s = 0, turn = 0;
       if (keys.KeyW || keys.ArrowUp) f += 1; if (keys.KeyS || keys.ArrowDown) f -= 1;
       if (keys.KeyD) s += 1; if (keys.KeyA) s -= 1;
-      if (keys.ArrowLeft || keys.KeyQ) turn += 1; if (keys.ArrowRight || keys.KeyE) turn -= 1;
+      if (keys.ArrowLeft) turn += 1; if (keys.ArrowRight) turn -= 1;
       if (joy.id !== null) { f += -joy.y; s += joy.x; }
       P.yaw += turn * 1.9 * dt;
       const run = keys.ShiftLeft || keys.ShiftRight ? 2.3 : 1;
@@ -541,6 +747,13 @@
     mg.setTransform(1, 0, 0, 1, 0, 0); mg.clearRect(0, 0, mini.width, mini.height);
     mg.drawImage(miniBase[l], 0, 0);
     mg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mg.lineCap = 'butt';
+    for (const D of DOORS) {                      // closed doors read as a solid bar, open ones as a faint mark
+      if (D.level !== l) continue;
+      const d = D.d, c = d.c * MS, a = d.lo * MS, b = d.hi * MS;
+      mg.strokeStyle = D.goal ? 'rgba(180,85,45,0.35)' : '#b4552d'; mg.lineWidth = D.goal ? 1 : 2.4;
+      mg.beginPath(); if (d.ax === 'x') { mg.moveTo(a, c); mg.lineTo(b, c); } else { mg.moveTo(c, a); mg.lineTo(c, b); } mg.stroke();
+    }
     let px, pz, yaw;
     if (state.mode === 'walk') { px = P.x * 1000; pz = P.z * 1000; yaw = P.yaw; }
     else { px = orbit.t.x * 1000; pz = orbit.t.z * 1000; yaw = orbit.a + Math.PI; }
@@ -585,7 +798,7 @@
   // ------------------------------------------------------------------ UI wiring
   function syncUI() {
     document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === state.mode));
-    $('tCeil').checked = state.ceil; $('tLabels').checked = state.labels; $('tFur').checked = state.fur; $('tCut').checked = state.cut; $('tRoof').checked = state.roof;
+    $('tDoors').checked = DOORS.length > 0 && DOORS.every((D) => D.goal === 1); $('tCeil').checked = state.ceil; $('tLabels').checked = state.labels; $('tFur').checked = state.fur; $('tCut').checked = state.cut; $('tRoof').checked = state.roof;
     if (FX) { $('qual').value = FX.state.quality; $('tod').value = Math.round(FX.state.tod * 100); }
     $('cutWrap').style.display = state.mode === 'orbit' ? '' : 'none';
     $('bothBtn').style.display = state.mode === 'orbit' ? '' : 'none';
@@ -603,6 +816,7 @@
     if (state.mode === 'walk') { if (l !== 'B') goLevel(l); }
     else { state.view = l; applyVisibility(); syncLevelButtons(); }
   }));
+  $('tDoors').addEventListener('change', (e) => setAllDoors(e.target.checked));
   $('tCeil').addEventListener('change', (e) => { state.ceil = e.target.checked; applyVisibility(); });
   $('tLabels').addEventListener('change', (e) => { state.labels = e.target.checked; applyVisibility(); });
   $('tFur').addEventListener('change', (e) => { state.fur = e.target.checked; applyVisibility(); });
@@ -757,10 +971,11 @@
   goLevel('G');
   setMode('walk');
   setTimeout(() => $('help').classList.add('fade'), 14000);
+  setTimeout(() => toast('Doors are closed. Face one and press E (or tap it) to open.'), 1800);
 
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    update(dt); drawHUD(dt); drawMini(); updateLights(dt);
+    update(dt); updateDoors(dt); updateTip(dt); drawHUD(dt); drawMini(); updateLights(dt);
     FX.render(dt);
     requestAnimationFrame(frame);
   }
@@ -799,6 +1014,10 @@
     orbit: (o) => Object.assign(orbit, o, o.t ? { t: new THREE.Vector3(o.t[0], o.t[1], o.t[2]) } : {}),
     state, P, key: (k, v) => { keys[k] = v; }, setRoof: (v) => { state.roof = v; applyVisibility(); syncUI(); }, setCeil: (v) => { state.ceil = v; applyVisibility(); syncUI(); },
     setLabels: (v) => { state.labels = v; applyVisibility(); syncUI(); }, setCut: (v) => { state.cut = v; applyVisibility(); syncUI(); },
+    setDoors: (open) => { DOORS.forEach((D) => setDoor(D, !!open, true, true)); syncUI(); },
+    doors: () => DOORS.map((D) => ({ n: D.name, l: D.level, e: D.e, goal: D.goal, x: D.mid.x, z: D.mid.z })),
+    toggleDoor: (name) => { const D = DOORS.find((q) => q.name === name); if (D) setDoor(D, !D.goal, true, true); return !!D; },
+    aimedDoor: () => { const D = aimedDoor(); return D ? D.name : null; }, interact: () => { const D = interact(); return D ? D.name : null; },
     counts: { coll: COLL.length, surf: SURF.length, meshes: cutMeshes.length }, reach, FX,
     setQuality: (q) => { FX.setQuality(q); syncUI(); }, setTime: (t) => { FX.setTime(t); }, now: () => performance.now(),
   };

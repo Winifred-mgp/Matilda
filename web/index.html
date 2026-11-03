@@ -75,6 +75,10 @@
   #knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.75)}
   #crosshair{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.8);box-shadow:0 0 0 1px rgba(0,0,0,.4);pointer-events:none}
   body[data-mode=orbit] #crosshair{display:none}
+  #doorTip{position:fixed;left:50%;bottom:calc(max(16px,env(safe-area-inset-bottom)) + 46px);transform:translate(-50%,8px);appearance:none;border:1px solid var(--panel-b);background:var(--panel);color:var(--ink);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:999px;padding:8px 16px;font:inherit;font-weight:600;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;cursor:pointer;white-space:nowrap;z-index:20}
+  #doorTip.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+  #doorTip kbd{background:var(--accent);color:var(--accent-ink);border-radius:5px;padding:0 7px;margin-right:4px;font:700 12px ui-monospace,Menlo,Consolas,monospace}
+  body[data-mode=orbit] #doorTip{display:none}
   @media (max-width:760px){
     #top{max-width:calc(100vw - 24px);width:calc(100vw - 24px);padding:8px 10px}
     #top .more{display:none}
@@ -104,6 +108,7 @@
     <label class="chk"><input type="checkbox" id="tFur" checked>Furniture</label>
     <label class="chk"><input type="checkbox" id="tLabels">Room labels</label>
     <label class="chk"><input type="checkbox" id="tRoof" checked>Roof</label>
+    <label class="chk"><input type="checkbox" id="tDoors">Open all doors</label>
     <label class="chk" id="cutWrap" style="display:none"><input type="checkbox" id="tCut" checked>Cut-away walls</label>
   </div>
   <div class="row more">
@@ -124,6 +129,7 @@
 </div>
 
 <div id="hud">Loading…</div>
+<button id="doorTip" type="button" aria-live="polite"></button>
 
 <div id="help" class="panel">
   <button id="helpClose" aria-label="Close help">×</button>
@@ -132,6 +138,7 @@
     <li data-for="walk"><kbd>W A S D</kbd><span>walk (<kbd>Shift</kbd> to hurry)</span></li>
     <li data-for="walk"><kbd>drag</kbd><span>look around · click once to capture the mouse</span></li>
     <li data-for="walk"><kbd>← →</kbd><span>turn · scroll to zoom the lens</span></li>
+    <li data-for="walk"><kbd>E</kbd><span>open / close the door you face (or click or tap it)</span></li>
     <li data-for="walk"><kbd>stairs</kbd><span>just walk up the U-shaped stair</span></li>
     <li data-for="walk"><kbd>touch</kbd><span>left thumb moves, right thumb looks</span></li>
     <li data-for="orbit"><kbd>drag</kbd><span>orbit</span></li>

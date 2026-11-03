@@ -18,6 +18,7 @@ geometry in the plan PDF, so wall positions and room sizes follow the drawing (f
 | Look | drag the mouse (or click once to capture it) · `← →` turn · touch: right thumb | right‑drag / two fingers = pan |
 | Zoom | scroll = lens zoom | scroll / pinch |
 | Stairs | just walk up the U‑shaped stair – the first floor is reached the same way as in the house | |
+| Doors | all doors start **closed**: face one and press `E` (or click / tap it, or tap the prompt) to open or close it | **Open all doors** in the menu |
 
 `Tab` switches Walk ↔ Dollhouse · `C` ceilings · `M` map. The **Ground / First / Both** buttons jump
 floors (Walk) or show/hide floors (Dollhouse). “Jump to room…” teleports to any room, and you can click
@@ -59,8 +60,11 @@ the choice is an assumption. Garage, porch and outdoor-living floors are not spe
 
 ## What is modelled
 
-* Walls, window and door openings at the positions drawn on the plans (windows are glazed, doors are open
-  doorways with frames, sliding doors are shown half open, the garage door is closed).
+* Walls, window and door openings at the positions drawn on the plans (windows are glazed). **Every door is drawn closed**: hinged
+  leaves with lever handles (laundry double doors, Newington front door with its glazing slot), two‑panel sliding robe doors, the
+  cavity sliders to the guest bedroom and walk‑in robe, the glass stacker door and the garage door. Open the hinged and sliding
+  doors with `E` / click / tap; a door only blocks you while it is shut, and it will not close on top of you. Open
+  doorways without a leaf (the walk‑in robe and ensuite openings) stay open.
 * The U‑shaped stair: 17 risers (≈171 mm) and 241 mm goings, with the landing and the first‑floor stair void and balustrade.
 * Floor finishes by room (timber, carpet, tile, concrete) following the shading on the plan; room names and sizes as labelled.
 * Indicative furniture and fixtures from the plan symbols (beds, sofas, kitchen, vanities, cars…) for a sense of scale.
@@ -69,7 +73,7 @@ the choice is an assumption. Garage, porch and outdoor-living floors are not spe
 
 ## Known simplifications
 
-* Door swings are read from the plan arcs and are indicative. The roof is an approximate hip (22.5°) with flat decks, not the engineered roof plan.
+* Door swings and hinge sides are read from the plan arcs and are indicative; the garage door is fixed shut. The roof is an approximate hip (22.5°) with flat decks, not the engineered roof plan.
 * Not placed: dishwasher, microwave, rangehood, towel rails, mirrors, flyscreens, stair wall rail. No landscaping.
 * Window sill heights are typical (700–950 mm; low sills for the dining window and stacker door, high sills for bath/ensuite/stair windows) –
   the sketch only shows plan positions, not elevations.

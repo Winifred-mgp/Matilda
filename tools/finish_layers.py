@@ -182,7 +182,7 @@ def apply(model, qa):
                 k = 'render' if front else 'brick'
             emit(d, c, a0, a1, 0, HW, k)
         solid_by[lv] = solid
-    _leaves(model, qa)
+    _doors(model, qa)
     _fixtures(model, qa)
     _roof(model, qa)
 
@@ -191,61 +191,57 @@ def _is_post(lv, w):
     return S.is_post(lv, w)
 
 
-# ------------------------------------------------------------------------------------ door leaves
 def _box(model, lv, m, k, b, c='deco', **kw):
     d = dict(l=lv, m=m, c=c, k=k, b=[int(v) for v in b]); d.update(kw)
     model['boxes'].append(d)
 
 
-def _leaves(model, qa):
+# ------------------------------------------------------------------------------------ doors
+# Doors are emitted as records (model['doors']) rather than boxes: the viewer builds them closed, and animates them
+# open and shut.  Along-axis coordinates are mm on the wall's own axis ('x' or 'z'), c is the wall centre line.
+LEAF_GAP = 3            # mm of shadow gap around a leaf
+JAMB = 35               # width of the door-frame trim added in build_model.add_opening
+FLOOR_GAP = 8           # leaf clearance above the finished floor
+
+
+def _doors(model, qa):
+    out = model['doors'] = []
     for lv in ('G', 'F'):
         fl = S.LEVELS[lv]['floor']
         for g in qa[lv]['ops']:
-            name = g['name']
-            spec = S.LEAVES.get(name)
-            if g['kind'] == 'entry':
-                spec = S.ENTRY_LEAF
-            if not spec:
+            name, kind = g['name'], g['kind']
+            if kind not in ('door', 'entry', 'slider'):
                 continue
             x0, z0, x1, z1 = g['x0'], g['z0'], g['x1'], g['z1']
             along_x = (x1 - x0) >= (z1 - z0)
-            gap = (x1 - x0) if along_x else (z1 - z0)
-            if g['kind'] == 'entry':
-                gap = 905
-            hinge, swing = spec
-            k = 'door_monument' if (g['kind'] == 'entry' or name in S.EXT_DOORS) else 'door_white'
-            h = S.DOOR_HEAD if g['kind'] != 'entry' else S.WIN_HEAD
-            t = 40
-            if hinge == 'both':
-                parts = [('min', gap / 2 - 12), ('max', gap / 2 - 12)]
-            else:
-                parts = [(hinge, gap - 30)]
-            for hg, w in parts:
-                w = int(w)
-                if along_x:
-                    hx = x0 + 18 if hg == 'min' else x1 - 18
-                    zs = z1 if swing > 0 else z0
-                    ze = zs + swing * w
-                    zlo, zhi = sorted((zs, ze))
-                    _box(model, lv, 'door', k, [hx - t // 2, fl, zlo, hx + t // 2, fl + h, zhi])
-                    free = ze - swing * 75
-                    _box(model, lv, 'door', 'black_matt', [hx - t // 2 - 26, fl + 960, free - 60, hx + t // 2 + 26, fl + 1000, free + 60])
-                    if g['kind'] == 'entry':
-                        _slot(model, lv, hx, None, zlo, zhi, fl, swing)
+            a0, a1 = (x0, x1) if along_x else (z0, z1)
+            c = (z0 + z1) // 2 if along_x else (x0 + x1) // 2
+            thk = (z1 - z0) if along_x else (x1 - x0)
+            d = dict(l=lv, n=name, ax='x' if along_x else 'z', c=int(c), thk=int(thk), fl=int(fl), y0=FLOOR_GAP)
+            if kind == 'slider':
+                head = g['head'] or S.DOOR_HEAD
+                d.update(y1=int(head - 4), lo=int(a0), hi=int(a1))
+                if 'stacker' in name.lower():
+                    d.update(t='stack', np=max(2, int(round((a1 - a0) / 1250.0))), k='frame')
+                elif name in S.SLIDER_KEYS:
+                    d.update(t='slide', np=2, k=S.SLIDER_KEYS[name])      # two overlapping robe panels
                 else:
-                    hz = z0 + 18 if hg == 'min' else z1 - 18
-                    xs = x1 if swing > 0 else x0
-                    xe = xs + swing * w
-                    xlo, xhi = sorted((xs, xe))
-                    _box(model, lv, 'door', k, [xlo, fl, hz - t // 2, xhi, fl + h, hz + t // 2])
-                    free = xe - swing * 75
-                    _box(model, lv, 'door', 'black_matt', [free - 60, fl + 960, hz - t // 2 - 26, free + 60, fl + 1000, hz + t // 2 + 26])
-
-
-def _slot(model, lv, hx, hz, lo, hi, fl, swing):
-    """Hume Newington XN1 has one tall vertical glazing slot."""
-    c = (lo + hi) // 2
-    model['glass'].append(dict(l=lv, obscure=True, b=[hx - 26, fl + 450, c - 40, hx + 26, fl + 1950, c + 40]))
+                    d.update(t='slide', np=1, k='door_white')             # cavity slider
+                out.append(d)
+                continue
+            if kind == 'entry':
+                spec = S.ENTRY_LEAF
+                d.update(t='hinge', k='door_monument', entry=True, y1=int(S.WIN_HEAD - 45 - LEAF_GAP),
+                         lo=int(a0 + 45 + LEAF_GAP), hi=int(a0 + 860 - LEAF_GAP))
+            else:
+                spec = S.LEAVES.get(name)
+                if not spec:
+                    continue
+                k = 'door_monument' if name in S.EXT_DOORS else 'door_white'
+                d.update(t='double' if spec[0] == 'both' else 'hinge', k=k, y1=int(S.DOOR_HEAD - 6),
+                         lo=int(a0 + JAMB + LEAF_GAP), hi=int(a1 - JAMB - LEAF_GAP))
+            d.update(hg=spec[0], sw=spec[1])
+            out.append(d)
 
 
 # ------------------------------------------------------------------------------------ fixtures
